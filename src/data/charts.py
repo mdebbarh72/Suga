@@ -91,3 +91,19 @@ def drawHeatmap(df):
     plt.yticks(rotation=0)
 
     plt.show()
+
+
+def drawPLot(scores, x, y):
+    #figure 
+    plt.figure(figsize=(8,5))
+    #plot
+    plt.plot(scores[x], scores[y], marker='o')
+    #style
+    plt.title(y)
+    plt.xlabel(x)
+    plt.ylabel(y)
+    plt.xticks(scores[x])
+    plt.grid(True, alpha= 0.3)
+
+    plt.show()
+

@@ -8,13 +8,14 @@ logger = get_logger("etracting_data")
 
 
 
-def readData() -> pd.DataFrame: 
+def readData(fileType = "raw") -> pd.DataFrame: 
 
     PROJECT_ROOT = Path(__file__).resolve().parents[2]
-    DATA_PATH = PROJECT_ROOT / "data" / "raw"
-    FILE_NAME = "diabetesDataset.csv"
+    DATA_PATH = PROJECT_ROOT / "data" 
+    DATA_DIR =  fileType if fileType in ['raw', 'processed'] else 'raw'
+    FILE_NAME = "diabetesDataProcessed.csv" if fileType == "processed" else 'diabetesDataset.csv' if fileType=='raw' else 'cleanedDataset.csv'
 
-    filePath = DATA_PATH / FILE_NAME
+    filePath = DATA_PATH / DATA_DIR / FILE_NAME
 
     if not filePath.exists(): 
         logger.critical(f"source file is missing")
