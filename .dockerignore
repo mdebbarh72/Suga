@@ -1,0 +1,23 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+
+# Notebooks
+notebooks/
+*.ipynb
+
+# Git
+.git/
+.gitignore
+
+# Development artifacts
+reports/
+*.log
+
+# Large binary files not needed at runtime
+mlflow.db
+notebooks/modeling/mlruns/

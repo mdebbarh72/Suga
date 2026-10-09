@@ -37,3 +37,14 @@ def robustScale(df):
         index= df.index
     )
 
+def standardizeTrainingData(train, test):
+
+    scaler = StandardScaler()
+
+    fitted_data = scaler.fit(train)
+
+    scaled_train = scaler.transform(train)
+    scaled_test= scaler.transform(test)
+
+    return (pd.DataFrame(scaled_train, columns=train.columns, index = train.index),
+             pd.DataFrame(scaled_test, columns= test.columns, index = test.index))

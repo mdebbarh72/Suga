@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import pandas as pd 
 import numpy as np
 import math
+from sklearn.decomposition import PCA
+
 
 
 plt.style.use("seaborn-v0_8-whitegrid")
@@ -107,3 +109,55 @@ def drawPLot(scores, x, y):
 
     plt.show()
 
+
+def plotClustersPCA(processedData, labels):
+
+    pca = PCA(n_components=2)
+
+    components = pca.fit_transform(processedData)
+
+    pca_df = pd.DataFrame(
+        components,
+        columns=["PC1", "PC2"]
+    )
+
+    pca_df["cluster"] = labels
+
+    sns.scatterplot(
+        data=pca_df,
+        x="PC1",
+        y="PC2",
+        hue="cluster",
+        palette="Set1",
+        s=60
+    )
+
+    plt.title("K-Means Clusters Visualized with PCA")
+    plt.xlabel(
+        f"PC1 ({pca.explained_variance_ratio_[0] * 100:.1f}%)"
+    )
+    plt.ylabel(
+        f"PC2 ({pca.explained_variance_ratio_[1] * 100:.1f}%)"
+    )
+    plt.legend(title="Cluster")
+    plt.show()
+
+
+def drawBarPlot(data, col):
+    plt.figure(figsize=(10, 6))
+
+    plt.bar(
+        data["model"],
+        data[f"{col}_mean"],
+        yerr=data[f"{col}_std"],
+        capsize=5
+    )
+
+    plt.ylabel(col)
+    plt.xlabel("Model")
+    plt.title(f"5-Fold Cross-Validation — {col}")
+    plt.xticks(rotation=45, ha="right")
+    plt.ylim(0, 1)
+
+    plt.tight_layout()
+    plt.show()

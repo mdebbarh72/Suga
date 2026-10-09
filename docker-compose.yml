@@ -1,0 +1,265 @@
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Airflow/Dockerfile
+
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver:8080/execution/"
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+    AIRFLOW__API__SECRET_KEY: ${AIRFLOW_API_SECRET_KEY}
+
+  volumes:
+    - ./Airflow:/opt/airflow/dags
+    - ./data:/opt/airflow/data
+    - ./models:/opt/airflow/models
+    - ./src:/opt/airflow/src
+    - airflow-logs:/opt/airflow/logs
+
+  depends_on:
+    postgres:
+      condition: service_healthy
+    mlflow:
+      condition: service_healthy
+
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # PostgreSQL - Airflow metadata database
+  # ──────────────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+    networks:
+      - suga-net
+
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # MLflow Tracking Server
+  # ──────────────────────────────────────────────────────────────────────────
+  mlflow:
+    build:
+      context: .
+      dockerfile: mlflow/Dockerfile
+
+    working_dir: /mlflow
+
+    command:
+      - mlflow
+      - server
+      - --backend-store-uri
+      - sqlite:///mlflow.db
+      - --artifacts-destination
+      - /mlflow/artifacts
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --allowed-hosts
+      - "mlflow:5000,localhost:5000,127.0.0.1:5000"
+
+    ports:
+      - "5000:5000"
+
+    volumes:
+      - mlflow-data:/mlflow
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - suga-net
+
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # FastAPI Prediction Service
+  # ──────────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_URI: "models:/diabetes-risk-classifier@production"
+      MODEL_PATH: /app/models/diabetes_cluster_classifier.joblib
+
+    volumes:
+      - ./models:/app/models
+
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - suga-net
+
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Streamlit UI
+  # ──────────────────────────────────────────────────────────────────────────
+  streamlit:
+    build:
+      context: .
+      dockerfile: app/Dockerfile.streamlit
+
+    ports:
+      - "8501:8501"
+
+    environment:
+      API_URL: http://api:8000
+
+    depends_on:
+      api:
+        condition: service_healthy
+
+    networks:
+      - suga-net
+
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Airflow Init
+  # ──────────────────────────────────────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+
+    command:
+      - bash
+      - -c
+      - |
+        airflow db migrate
+
+        if ! airflow users list | grep -q "admin"; then
+          airflow users create \
+            --username admin \
+            --password admin \
+            --firstname Admin \
+            --lastname User \
+            --role Admin \
+            --email admin@suga.lab
+        fi
+
+    networks:
+      - suga-net
+
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Airflow API Server
+  #
+  # Airflow 3.x replaced:
+  #     airflow webserver
+  #
+  # with:
+  #     airflow api-server
+  # ──────────────────────────────────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+
+    command:
+      - airflow
+      - api-server
+      - --port
+      - "8080"
+
+    ports:
+      - "8080:8080"
+
+    healthcheck:
+      test:
+        - "CMD"
+        - "curl"
+        - "--fail"
+        - "http://localhost:8080/health"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    networks:
+      - suga-net
+
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Airflow Scheduler
+  # ──────────────────────────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+
+    command:
+      - airflow
+      - scheduler
+
+    networks:
+      - suga-net
+
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Airflow DAG Processor
+  #
+  # Airflow 3.x separates DAG processing from the scheduler.
+  # This service reads DAG files from /opt/airflow/dags
+  # and processes them into the Airflow metadata database.
+  # ──────────────────────────────────────────────────────────────────────────
+  airflow-dag-processor:
+    <<: *airflow-common
+
+    command:
+      - airflow
+      - dag-processor
+
+    networks:
+      - suga-net
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Named Volumes
+# ────────────────────────────────────────────────────────────────────────────
+volumes:
+  postgres-data:
+  mlflow-data:
+  airflow-logs:
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Network
+# ────────────────────────────────────────────────────────────────────────────
+networks:
+  suga-net:
+    driver: bridge

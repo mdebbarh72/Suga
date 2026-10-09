@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-logger = get_logger("etracting_data")
+logger = get_logger("extracting_data")
 
 
 def KNNImputation(df):
@@ -71,7 +71,7 @@ def chooseImputeMethod(df):
     df_median = medianImputation(df_masked)
     df_iterative = iterativeImputation(df_masked)
 
-    median_score = evaluateImputation(df_knn, masked_values)
+    median_score = evaluateImputation(df_median, masked_values)
     knn_score = evaluateImputation(df_knn, masked_values)
     iterative_score = evaluateImputation(df_iterative, masked_values)
 
@@ -114,5 +114,22 @@ def evaluateImputation(df_imputed, masked_values):
         "RMSE" : rmse_scores
     }
 
+
+def deleteOutliers(df):
+
+    cols = ['SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction']
+
+    for col in cols:
+
+        Q1 = df[col].quantile(0.25)
+        Q3= df[col].quantile(0.75)
+        IQR = Q3-Q1 
+
+        lowerBound = Q1 - IQR*3
+        upperBound  = Q3 + IQR*3
+
+        df[col] = df[col].clip(lower= lowerBound, upper=upperBound)
+
+    return df
 
 

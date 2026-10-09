@@ -1,0 +1,30 @@
+{
+    "model_name": "svm",
+    "features": [
+        "Glucose",
+        "BloodPressure",
+        "SkinThickness",
+        "Insulin",
+        "BMI",
+        "DiabetesPedigreeFunction",
+        "Age"
+    ],
+    "cluster_labels": [
+        0,
+        1
+    ],
+    "sklearn_version": "1.9.1",
+    "best_params": {
+        "classifier__C": 10,
+        "classifier__gamma": "scale",
+        "classifier__kernel": "linear"
+    },
+    "test_metrics": {
+        "accuracy": 0.9956709956709957,
+        "balanced_accuracy": 0.9959349593495934,
+        "precision_weighted": 0.9957107113070416,
+        "recall_weighted": 0.9956709956709957,
+        "f1_weighted": 0.995672135632636,
+        "f1_macro": 0.9956550362080316
+    }
+}
